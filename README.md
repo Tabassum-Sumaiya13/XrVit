@@ -28,6 +28,7 @@ One training seed (42), no test-time augmentation, per-class Platt calibration a
 | Path | Contents |
 |---|---|
 | [RESULTS.md](RESULTS.md) | Full report: cascade study, why its gate cannot be fixed, distillation study, recommendations |
+| [METHODOLOGY.md](METHODOLOGY.md) | Every mechanism of the final (distilled) model: data, preprocessing, teachers, loss, calibration, thresholds, distillation, evaluation, QC, with references |
 | [evaluation_protocol.yaml](evaluation_protocol.yaml) | Rules fixed before each experiment (v2.0.0 cascade, v2.1.0 layer depth, v2.2.0 distillation) |
 | [2-staged_official_split.ipynb](2-staged_official_split.ipynb) | Cascade study: training both models, calibration, gate sweep, test metrics, compute |
 | [3-raddino_layer_cut.ipynb](3-raddino_layer_cut.ipynb) | Layer-depth experiment: linear probes on each of RAD-DINO's 12 blocks (not part of RESULTS.md) |
