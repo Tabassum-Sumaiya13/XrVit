@@ -1,0 +1,259 @@
+# =============================================================================
+# EVALUATION PROTOCOL - two-stage cascade on NIH ChestX-ray14 (official split)
+# Version 2.1.0 (2026-09-25). Cascade study: 2-staged_official_split.ipynb (rules of 2.0.0, unchanged).
+# Layer-depth experiment (section layer_depth, added in 2.1.0): 3-raddino_layer_cut.ipynb.
+# Scope: one dataset, one split, two models, one training seed (42), no TTA.
+# This file holds rules only, no results.
+# =============================================================================
+
+protocol:
+  id: CXR-CASCADE-EVAL
+  version: "2.1.0"
+  task: multi-label binary classification of 14 findings on frontal chest X-rays
+  label_order: [Atelectasis, Cardiomegaly, Effusion, Infiltration, Mass, Nodule,
+                Pneumonia, Pneumothorax, Consolidation, Edema, Emphysema,
+                Fibrosis, Pleural_Thickening, Hernia]
+  label_note: '"No Finding" is not a label; such an image is an all-zero vector. Every exported array uses this order.'
+
+  goals:
+    primary: Compare the cascade with each model alone and with the average of both, on the official NIH test set.
+    endpoints:
+      primary: macro AUROC (threshold-free ranking quality)
+      secondary: [macro AUPRC, macro F1, micro F1, macro precision, macro recall, macro specificity]
+      cascade: [stage2_fraction, compute_ratio_vs_raddino, labels_missed_by_stage1]
+    not_goals:
+      - Clinical validation or deployment claims.
+      - Estimating training-run variability (only one seed is trained).
+
+  # ---------------------------------------------------------------------------
+  data:
+    dataset: NIH ChestX-ray14 (Kaggle nih-chest-xrays/data), 112,120 images, 30,805 patients
+    labels: NLP-mined from radiology reports (noisy)
+    split:
+      id: NIH_OFFICIAL_PV
+      test: every image in the official test_list.txt (25,596 images, 2,797 patients)
+      validation: random 15 % of the patients in train_val_list.txt (sklearn GroupShuffleSplit, seed 42, rows sorted by image index)
+      train: the remaining train_val patients
+      expected_sizes: {train: 73916, val: 12608, test: 25596}
+      list_sha256:                    # SHA-256 of the sorted, LF-joined image ids
+        train_val_list.txt: 61fbe896321c1c1c8b75f3e4f3a08e4fef6486d95ef8a667c31d4d60dca6cb81
+        test_list.txt: 38ca5ef7f756092946f57c1a59faca882ed589a1ab1f72590b45dc06c6d5e1cc
+      split_file: split_NIH_OFFICIAL_PV.csv (image_index, patient_id, partition; sorted, LF, UTF-8)
+      split_sha256: b9f2fbc9aa061dafa76994494b92779651dc3ddd2ed3e7b82c70bbf5cf7071dd
+      rules:
+        - No patient appears in more than one partition.
+        - The split file must reproduce split_sha256. A model trained on another split is not comparable and is not used.
+    known_shift: >-
+      The official test set differs from train/val: about 1.7x more findings per image, about 3x more
+      images per patient, fewer PA views, and 2-4x higher prevalence for several findings. Report T1 with
+      every result, because this shift changes cascade routing between validation and test.
+
+  # ---------------------------------------------------------------------------
+  models:
+    common:
+      input: grayscale PNG -> [0,1] -> bilinear resize (torchvision) -> replicated to 3 channels -> fixed normalisation
+      loss: {name: AsymmetricLoss, gamma_neg: 4, gamma_pos: 1, clip: 0.05}
+      optimizer: AdamW, weight decay 0.05, cosine schedule with 3 % linear warm-up per phase, gradient clipping 1.0
+      phases: head-only warm-up, then fine-tuning
+      augmentation_train_only: {random_resized_crop: {scale: [0.85, 1.0], ratio: [0.9, 1.1]}, hflip_p: 0.5,
+                                rotation: {deg: 7, p: 0.5}, color_jitter: {brightness: 0.1, contrast: 0.1}}
+      early_stopping: validation macro AUROC (raw logits), patience 2 fine-tune epochs, earlier epoch wins ties
+      precision: fp16 autocast (T4 GPU)
+      determinism: cudnn deterministic, seeded DataLoader workers, CUBLAS_WORKSPACE_CONFIG=:4096:8
+      seed: 42
+    M08_CONVNEXT_TINY_ASL_384_CR:
+      role: stage 1
+      backbone: convnext_tiny.fb_in22k_ft_in1k (timm), full fine-tune
+      input_size: 384
+      normalisation: ImageNet mean/std
+      head: dropout 0.2 + linear -> 14
+      schedule: 1 warm-up epoch (head LR 1e-3), up to 8 fine-tune epochs (head and backbone LR 1e-4)
+      batch_size: 32
+      drop_path: 0.1
+    M09_RAD_DINO_518_CR:
+      role: stage 2
+      backbone: microsoft/rad-dino (ViT-B/14), last 8 of 12 blocks + final layernorm trained, layer-wise LR decay 0.8
+      input_size: 518
+      normalisation: {mean: 0.5307, std: 0.2583}
+      pooling: CLS concatenated with mean of patch tokens (1536-d)
+      head: dropout 0.2 + linear -> 14
+      schedule: 2 warm-up epochs (head LR 1e-3), up to 4 fine-tune epochs (head 2e-4, backbone 2e-5)
+      batch_size: 12
+      drop_path: 0.1
+      ema: decay 0.999; EMA weights are the evaluated weights
+    tta: none (logits of the original image only)
+
+  # ---------------------------------------------------------------------------
+  systems:
+    CNN alone: M08 with its own calibration and thresholds (lower reference)
+    RAD-DINO alone: M09 with its own calibration and thresholds (reference for compute ratio = 1)
+    Average CNN+RAD-DINO: mean of the two calibrated probabilities on every image (upper reference)
+    Cascade:
+      gate: >-
+        A finding is confident if the calibrated CNN probability is <= lo or >= hi.
+        An image is routed to stage 2 if any of its 14 findings is not confident.
+      routing_modes:
+        image: stage 2 decides all 14 findings of a routed image
+        finding: stage 2 decides only the unsure findings (RAD-DINO still runs on the whole image, so cost is the same)
+      confident_decisions: Yes if p >= hi, otherwise No
+      stage2_thresholds: re-tuned per class on validation to maximise overall F1 given the CNN's fixed decisions
+      sweep:
+        flat_gates: "lo = 1 - t, hi = t for t in [0.70, 0.80, 0.90, 0.95, 0.98]"
+        per_class_gates: "lo_c = quantile of positive-class p at miss budget [1, 2, 5, 10] %; hi_c = lowest p with precision >= 0.80 (at least 20 images)"
+        stage2_models: [RAD-DINO (all variants), Average CNN+RAD-DINO (flat gates, image mode only)]
+      selection_rule: >-
+        On validation only: among all sweep settings whose validation macro F1 is within 0.01 of
+        RAD-DINO alone, pick the one sending the fewest validation images to stage 2
+        (ties: higher validation macro F1). If none qualifies, pick the highest validation macro F1.
+
+  # ---------------------------------------------------------------------------
+  layer_depth:
+    added: >-
+      2026-09-25, after the v2.0.0 cascade results were known and before any layer-depth result existed.
+      Nothing in this section changes the cascade study.
+    question: >-
+      How much accuracy does RAD-DINO keep, and how much forward-pass time does it save, if every image
+      stops after block k of 12 (k = 1..12)? No gate: the same depth is used for every image.
+    source_model: "M09_RAD_DINO_518_CR, seed 42, EMA weights, checkpoint_best.pt sha256 070f90c7cf44c54447a015791f5a18d0eb0d8b05bce070450b6c35e91008bd93; not retrained"
+    features: >-
+      Output of block k -> the model's final layernorm -> CLS concatenated with the mean of patch tokens
+      (1536-d, the same pooling as the trained head); fp16; one forward pass over train, val and test
+      with the eval transforms of models.common.
+    probe:
+      head: "linear 1536 -> 14 per depth, seeded init; features standardised with train mean/std"
+      loss: AsymmetricLoss as in models.common
+      optimizer: "AdamW, lr 1e-3, weight decay 1e-4, batch 1024, up to 50 epochs"
+      early_stopping: validation macro AUROC (raw logits), patience 5 epochs, earlier epoch wins ties
+      fitted_on: train (head), validation (early stopping); never test
+    systems: "CNN alone, RAD-DINO alone (M09 with its trained head), Depth k probes for k = 1..12"
+    calibration_and_thresholds: same as evaluation.order steps 2-3, per system, on validation
+    selection_rule: >-
+      On validation only: the smallest k whose validation macro AUROC is >= RAD-DINO alone's validation
+      macro AUROC - 0.005. The tolerance is half the CNN-vs-RAD-DINO test gap (0.010), so a selected depth
+      should be clearly better than the CNN. If no depth qualifies, only the curve is reported.
+    endpoints:
+      primary: test macro AUROC of the selected depth
+      secondary: [macro AUPRC, macro F1, micro F1, macro precision, macro recall]
+      compute: compute_ratio = latency(depth k) / latency(depth 12), both from the same session, batch 32 (batch 1 also reported)
+    comparisons:
+      confirmatory: >-
+        selected depth vs RAD-DINO alone, vs CNN alone, and vs the depth-12 probe (like-for-like: separates
+        the effect of depth from the effect of a probe head); paired patient-level bootstrap as in statistics;
+        Holm over these comparisons per metric (the depth-12 comparison is dropped if depth 12 is selected).
+      descriptive: every depth vs RAD-DINO alone on macro AUROC and macro F1, with CIs, no significance claim.
+    timing: >-
+      As compute.how, for RAD-DINO with num_hidden_layers = k (random weights, pooling and head included),
+      k = 1..12, in one session on one GPU. The CNN's ratio uses the v2.0.0 session-T timings.
+    limitations:
+      - The probe is a lower bound for a model cut to k blocks; fine-tuning the cut model could do better.
+      - Blocks 1-4 were frozen during M09 training and blocks 5-11 were trained only to feed block 12.
+      - Train features come from a model fine-tuned on the same images, so probe training fit may look optimistic; validation and test are unaffected.
+      - One training seed.
+
+  # ---------------------------------------------------------------------------
+  evaluation:
+    order:
+      - "1. Export raw logits for val and test (npz: image_index, patient_id, logits float32 [N,14], labels uint8 [N,14], label_order, split_sha256)."
+      - "2. Fit per-class Platt calibration p = sigmoid(a_c * z + b_c) on validation logits (binary NLL, L-BFGS)."
+      - "3. Per-class decision threshold = the one maximising validation F1 on calibrated probabilities (candidates = unique validation scores; ties -> smallest; F1 = 0 -> 0.5, flagged)."
+      - "4. Run the cascade sweep and select the gate on validation."
+      - "5. Apply calibration, thresholds and gate unchanged to test; compute metrics and bootstrap CIs."
+    test_isolation: >-
+      Test logits are exported during training, but no test metric is computed there. Test labels are
+      used only in the evaluation session, after every choice above is frozen. Early stopping,
+      calibration, thresholds and gate selection never see test data.
+
+  # ---------------------------------------------------------------------------
+  metrics:
+    notation: "per class c: TP, FP, TN, FN at threshold tau_c; P = TP + FN; macro = mean over the 14 classes (nanmean); micro = pooled counts"
+    auroc: "Mann-Whitney form, ties count 0.5 (= sklearn roc_auc_score). Primary endpoint."
+    auprc: "Average precision, step-wise, no interpolation (= sklearn average_precision_score)."
+    precision: "TP / (TP + FP); 0 if nothing predicted positive"
+    recall: "TP / P"
+    specificity: "TN / (TN + FP)"
+    f1: "2TP / (2TP + FP + FN); macro = mean of per-class F1 (not F1 of macro P and R); micro from pooled counts"
+    ece: "15 equal-width bins per class, empty bins skipped; macro mean; diagnostic only"
+    undefined_values: "AUROC/AUPRC with no positives or no negatives -> NaN, excluded from the macro mean"
+    cascade:
+      stage2_fraction: images routed to stage 2 / all images (reported for val and test)
+      compute_ratio_vs_raddino: "(t_CNN + stage2_fraction * t_RADDINO) / t_RADDINO, per-image forward-pass latency at batch 32"
+      labels_missed_by_stage1: "positive labels on images decided by the CNN alone that it called No (safety metric)"
+    rounding: "store full precision; round only when displaying (4 decimals aggregate, 3 per class)"
+
+  statistics:
+    ci: "95 % percentile bootstrap, 1000 resamples of test patients (seed 20260922), same resamples for every system; calibration, thresholds and gate held fixed"
+    paired_comparison: "difference A - B on the same resamples; two-sided p = 2 * min(P(d <= 0), P(d >= 0)), floor 1/1001"
+    multiple_testing: Holm over the 6 system pairs of one metric
+    significant: CI of the difference excludes 0 AND Holm p < 0.05
+    compared_metrics: [macro AUROC, macro AUPRC, macro F1, micro F1, macro precision, macro recall]
+    single_seed_limitation: CIs cover test-set sampling only; they say nothing about retraining with another seed.
+
+  compute:
+    what: forward-pass latency per image on a preloaded tensor, fp16, no TTA
+    how: one Tesla T4; batch sizes 1 and 32; 50 warm-up + 200 timed iterations, CUDA events; 3 repeats; statistic = median of repeat medians
+    weights: random weights of the same architecture are allowed (latency does not depend on weight values)
+    composite_cost: "t_CNN + stage2_fraction * t_RADDINO (members run one after the other); break-even stage2_fraction = 1 - t_CNN / t_RADDINO"
+    rule: both models timed with the same code on the same GPU type
+
+  # ---------------------------------------------------------------------------
+  outputs:
+    per_run_folder: "{dataset}__{split}__{model_id}__s42 (older folders may carry a config hash: ...__{hash}__s42__r0): config.json, train_log.csv, checkpoint_best.pt, logits_val.npz, logits_test.npz"
+    root_files: [split_NIH_OFFICIAL_PV.csv, timing_<model_id>.json, calibration.json, thresholds.json, cascade_tradeoff.png, qc_report.csv]
+    tables:
+      T1_dataset_characteristics: per partition - images, patients, images per patient, findings per image, all-negative images, PA fraction, sex, age, per-label positives and prevalence
+      T2_results: long format - system, eval_set (val/test), metric, class (label, MACRO, MICRO, GLOBAL), value, 95 % CI (test only)
+      T3_paired_comparisons: every system pair per compared metric - delta, CI, relative delta, p, Holm p, significant
+      T4_cascade_sweep: every gate setting - val and test stage2_fraction, compute ratio, macro F1, macro AUROC, labels_missed_by_stage1, selected_on_val
+      T5_per_class: per finding - support, prevalence, AUROC/AUPRC/F1/recall of the four systems, % decided by the CNN, labels missed by stage 1
+      T6_compute: latency (bs 1 and 32), throughput, parameters, training hours; cascade/ensemble val and test routing, compute ratios, break-even fraction
+      T7_layer_results: layer_depth, long format like T2 - CNN alone, RAD-DINO alone and Depth 1-12; value, 95 % CI (test only), selected_on_val
+      T8_layer_paired: layer_depth - confirmatory comparisons of the selected depth (Holm) and descriptive depth-vs-RAD-DINO differences
+      T9_layer_compute: layer_depth - per system latency (bs 1 and 32), compute ratio, val and test macro AUROC/AUPRC/F1 with CIs, selected_on_val
+    layer_depth_files: "features/{split}_Lkk.npy (fp16), one run folder per depth ({dataset}__{split}__M09_RAD_DINO_518_CR_Lkk__s42: logits_val.npz, logits_test.npz, probe_log.csv, config.json), timing_M09_RAD_DINO_518_CR_Lkk.json, calibration_thresholds_layers.json, layer_depth_curve.png, qc_session_L.json, qc_report_layers.csv"
+    presentation:
+      - "Test values are shown as value [ci_low, ci_high]; validation and test never share a column."
+      - "Per-class rows with support < 100 carry a wide-uncertainty flag."
+      - "Every table states: split id and hash, seed 42 (single seed), no TTA, Platt calibration, F1-max thresholds."
+
+  quality_control:
+    blocking:
+      QC-01: official split counts (test 25,596; train + val 86,524) and list-file hashes
+      QC-02: no patient in more than one partition
+      QC-03: split file hash = expected hash = split hash stored in both runs' logits
+      QC-04: both models have identical val/test images, order and labels; test = official test list
+      QC-05: exported label order = protocol label order
+      QC-06: calibration, thresholds and gate fitted on validation only
+      QC-07: every stored macro value equals the mean of its stored per-class values
+    warnings:
+      QC-08: timing missing, provisional, or from different GPUs
+      QC-09: single seed
+    layer_depth_blocking:
+      QC-L1: the M09 checkpoint's sha256 equals the recorded hash; every probe records that hash as its source
+      QC-L2: val/test images and labels built in the layer session equal those in M09's exported logits
+      QC-L3: the trained M09 head applied to the block-12 features reproduces M09's saved validation logits (min per-class correlation >= 0.999, macro AUROC within 0.001)
+      QC-L4: every layer_depth system has identical val/test images, labels, patients, split hash and label order
+    layer_depth_warnings:
+      QC-10: the probe is a lower bound for a model cut to k blocks
+
+  limitations:
+    - One training seed; no estimate of training variability.
+    - Legacy CR/WB results used other splits and are not comparable with these results.
+    - Cascade cost is composed from separately measured model latencies (image decoding and routing overhead not included).
+
+  changelog:
+    - {version: "1.0.0", date: "2026-09-22", change: initial multi-seed, multi-dataset protocol}
+    - {version: "1.1.0", date: "2026-09-22", change: execution details added}
+    - version: "2.0.0"
+      date: "2026-09-24"
+      change: >-
+        Simplified to the study actually run: seed 42 only; no TTA; legacy models, legacy splits,
+        cross-dataset rules, seed aggregation, secondary threshold strategies, determinism probe,
+        pixel-hash check, test-access log and config-hash identity removed. Metrics reduced to
+        AUROC, AUPRC, precision, recall, specificity, F1, ECE plus the cascade metrics. Tables
+        renumbered T1-T6. Timing no longer needs trained checkpoints.
+    - version: "2.1.0"
+      date: "2026-09-25"
+      change: >-
+        Added the layer_depth experiment (3-raddino_layer_cut.ipynb): linear probes on the output of each of
+        RAD-DINO's 12 blocks, selection rule (within 0.005 validation macro AUROC), tables T7-T9 and QC-L1..L4, QC-10.
+        Written after the v2.0.0 cascade results and before any layer-depth result. Cascade rules unchanged.
