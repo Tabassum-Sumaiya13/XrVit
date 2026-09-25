@@ -34,11 +34,16 @@ One training seed (42), no test-time augmentation, per-class Platt calibration a
 | [4-distillation.ipynb](4-distillation.ipynb) | Distillation study: teacher soft labels and go/no-go (D1), student training (D2), evaluation (D3) |
 | [exploratory/](exploratory/) | Post hoc analysis scripts behind RESULTS.md sections 7 and 8.4 (see its README) |
 | [DM_Workbook.xlsx](DM_Workbook.xlsx) | Results workbook; sheet 7 = distillation |
-| `train_val_list.txt`, `test_list.txt` | Official NIH split lists (hashes checked by every notebook) |
 | `1610.02391v4.pdf` | Reference: Grad-CAM (Selvaraju et al.) |
 | `2511.19920v1.pdf` | Reference: image search with visual large models (Wang et al., 2025) |
 
-**Not in git** (see [.gitignore](.gitignore)): result folders (`results_s42/`, `results_layers/`, `results_distill/`), model checkpoints, dataset copies and zip files. They are produced by the notebooks; checkpoints are 100–350 MB each.
+**Not in git** (see [.gitignore](.gitignore)): the result folders and zip files. They are produced by the notebooks and kept locally for future runs:
+
+- `results_s42/`: cascade study tables, logits, and both trained teachers (`runs/*/checkpoint_best.pt`, 106 MB and 330 MB).
+- `results_distill/`: distillation tables, the student checkpoint, the teachers' training-set logits and the soft labels (reusable without a GPU).
+- `results_layers/`: layer-depth tables.
+
+The official split lists (`train_val_list.txt`, `test_list.txt`) come with the NIH dataset on Kaggle; every notebook checks their SHA-256.
 
 ## How to reproduce
 
@@ -46,7 +51,7 @@ All notebooks run on Kaggle with a Tesla T4 GPU and Internet on.
 
 1. Attach the dataset `nih-chest-xrays/data` (images, `Data_Entry_2017.csv`, official list files).
 2. **Cascade** ([2-staged_official_split.ipynb](2-staged_official_split.ipynb)): set one flag per session in the config cell. Sessions A and B train the CNN (about 2.8 h) and RAD-DINO (about 6.6 h), session T measures latency, and session C (CPU) runs calibration, the gate sweep and all test metrics. Outputs go to `results_s42/`.
-3. **Distillation** ([4-distillation.ipynb](4-distillation.ipynb)): attach the `results_s42/` outputs with both `checkpoint_best.pt` files inside their run folders (the notebook checks their SHA-256), then run sessions D1+D2 on GPU (about 3.5 h) and D3 on CPU (about 15 min). Outputs go to `results_distill/`.
+3. **Distillation** ([4-distillation.ipynb](4-distillation.ipynb)): upload `results_s42/` as a Kaggle dataset (it already holds both `checkpoint_best.pt` files inside their run folders; the notebook checks their SHA-256), then run sessions D1+D2 on GPU (about 3.5 h) and D3 on CPU (about 15 min). Outputs go to `results_distill/`.
 4. Every notebook checks the split hash (`b9f2fbc9…`), patient separation and identical evaluation images before reporting anything.
 
 ## Limitations
