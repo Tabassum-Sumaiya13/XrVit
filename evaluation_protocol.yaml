@@ -1,14 +1,15 @@
 # =============================================================================
 # EVALUATION PROTOCOL - two-stage cascade on NIH ChestX-ray14 (official split)
-# Version 2.1.0 (2026-09-25). Cascade study: 2-staged_official_split.ipynb (rules of 2.0.0, unchanged).
+# Version 2.2.0 (2026-09-25). Cascade study: 2-staged_official_split.ipynb (rules of 2.0.0, unchanged).
 # Layer-depth experiment (section layer_depth, added in 2.1.0): 3-raddino_layer_cut.ipynb.
+# Distillation experiment (section distillation, added in 2.2.0): 4-distillation.ipynb.
 # Scope: one dataset, one split, two models, one training seed (42), no TTA.
 # This file holds rules only, no results.
 # =============================================================================
 
 protocol:
   id: CXR-CASCADE-EVAL
-  version: "2.1.0"
+  version: "2.2.0"
   task: multi-label binary classification of 14 findings on frontal chest X-rays
   label_order: [Atelectasis, Cardiomegaly, Effusion, Infiltration, Mass, Nodule,
                 Pneumonia, Pneumothorax, Consolidation, Edema, Emphysema,
@@ -151,6 +152,67 @@ protocol:
       - One training seed.
 
   # ---------------------------------------------------------------------------
+  distillation:
+    added: >-
+      2026-09-25, after the v2.0.0 cascade results were known and before any distillation result existed.
+      Nothing in this section changes the cascade or layer-depth studies.
+    question: >-
+      Can a ConvNeXt-Tiny trained on the soft predictions of the CNN+RAD-DINO average reach RAD-DINO-level
+      accuracy at the CNN's inference cost? RAD-DINO is used at training time only.
+    motivation: >-
+      Exploratory analysis of the v2.0.0 cascade (post hoc, not confirmatory): gates computed from CNN outputs
+      found the images where stage 2 helps barely better than chance, because most of stage 2's benefit sits on
+      positives the CNN scores low. Distillation moves RAD-DINO's information into the CNN instead of routing.
+    teacher:
+      definition: "q = (p_M08 + p_M09) / 2 - the 'Average CNN+RAD-DINO' system of v2.0.0, unchanged"
+      members:
+        M08_CONVNEXT_TINY_ASL_384_CR: "checkpoint_best.pt sha256 eebd5f662d397d2fedeb5aa3fc70a2b59d70b05923e6c6712bf91049b9df70ad"
+        M09_RAD_DINO_518_CR: "checkpoint_best.pt sha256 070f90c7cf44c54447a015791f5a18d0eb0d8b05bce070450b6c35e91008bd93 (EMA weights); microsoft/rad-dino revision 110cbc18d5133582e320b43d53bf5c44e410c936"
+      calibration: v2.0.0 calibration.json (per-class Platt, fitted on validation); not refitted
+      soft_labels: >-
+        one forward pass over the train images with the eval transforms of models.common (no augmentation);
+        fp16; stored once and reused every epoch. Only train images get soft labels.
+      weight_note: "Equal weights. A 0.4/0.6 mix looked better on test in post hoc analysis and is not used."
+    go_no_go:
+      measure: teacher macro AUROC on the train images (hard labels), with each member's value reported
+      rule: >-
+        Go if the teacher's train macro AUROC is < 0.95. At >= 0.95 the teacher reproduces the training labels
+        almost perfectly, its soft labels carry little beyond the hard labels, and the student is not trained.
+      reference: teacher validation macro AUROC (0.8735 in v2.0.0) is reported next to it
+    student:
+      model_id: M10_CONVNEXT_TINY_KD_384
+      architecture_and_recipe: >-
+        identical to M08 in models.common and models.M08 (same backbone and ImageNet initialisation, not the
+        M08 checkpoint; same input, augmentation, optimiser, schedule, batch size, early stopping, seed 42).
+        The only change is the training target.
+      target: "t = (1 - lambda) * y + lambda * q, lambda = 0.5 (y = hard label, q = teacher soft label)"
+      loss: >-
+        AsymmetricLoss(logits, t) with the models.common settings. ASL is linear in the target, so this equals
+        0.5 * ASL(logits, y) + 0.5 * ASL(logits, q): both parts on the same scale.
+      model_selection: validation macro AUROC against hard labels, as models.common
+    evaluation:
+      calibration_and_thresholds: evaluation.order steps 2-3, fitted on validation for the student
+      systems: [CNN alone, RAD-DINO alone, Average CNN+RAD-DINO, Distilled CNN (M10)]
+      endpoints:
+        primary: test macro AUROC of the Distilled CNN
+        secondary: [macro AUPRC, macro F1, micro F1, macro precision, macro recall]
+      comparisons: >-
+        Distilled - CNN, Distilled - RAD-DINO, Distilled - Average; paired patient-level bootstrap as in
+        statistics; Holm over these 3 comparisons per metric.
+      outcomes:
+        helps: Distilled - CNN macro AUROC significant (statistics.significant)
+        matches_raddino: lower 95 % CI bound of Distilled - RAD-DINO macro AUROC > -0.005 (half the v2.0.0 CNN-vs-RAD-DINO test gap, as in layer_depth)
+        beats_raddino: Distilled - RAD-DINO macro AUROC significant and positive
+        fails: helps not met
+      compute: >-
+        inference cost = M08's v2.0.0 session-T latency (same architecture): compute_ratio = t_M08 / t_M09.
+        Training cost reported separately: teacher soft-label pass + student training hours.
+    limitations:
+      - One training seed; a small gain may not survive retraining.
+      - Teacher soft labels come from models trained on the same train images, so they are sharper than on unseen images.
+      - Validation is used for teacher calibration (v2.0.0), student early stopping, and student calibration/thresholds; test is never used.
+
+  # ---------------------------------------------------------------------------
   evaluation:
     order:
       - "1. Export raw logits for val and test (npz: image_index, patient_id, logits float32 [N,14], labels uint8 [N,14], label_order, split_sha256)."
@@ -209,7 +271,8 @@ protocol:
       T7_layer_results: layer_depth, long format like T2 - CNN alone, RAD-DINO alone and Depth 1-12; value, 95 % CI (test only), selected_on_val
       T8_layer_paired: layer_depth - confirmatory comparisons of the selected depth (Holm) and descriptive depth-vs-RAD-DINO differences
       T9_layer_compute: layer_depth - per system latency (bs 1 and 32), compute ratio, val and test macro AUROC/AUPRC/F1 with CIs, selected_on_val
-    layer_depth_files: "features/{split}_Lkk.npy (fp16), one run folder per depth ({dataset}__{split}__M09_RAD_DINO_518_CR_Lkk__s42: logits_val.npz, logits_test.npz, probe_log.csv, config.json), timing_M09_RAD_DINO_518_CR_Lkk.json, calibration_thresholds_layers.json, layer_depth_curve.png, qc_session_L.json, qc_report_layers.csv"
+    distillation_files: "teacher/{model_id}_logits_train.npz, teacher/{model_id}_logits_val_rebuilt.npz, soft_labels_train.npz, distill_go_no_go.json, qc_session_D.json, run folder {dataset}__{split}__M10_CONVNEXT_TINY_KD_384__s42 (as per_run_folder); evaluation tables T10_distill_results (like T2), T11_distill_paired (like T3)"
+    layer_depth_files:"features/{split}_Lkk.npy (fp16), one run folder per depth ({dataset}__{split}__M09_RAD_DINO_518_CR_Lkk__s42: logits_val.npz, logits_test.npz, probe_log.csv, config.json), timing_M09_RAD_DINO_518_CR_Lkk.json, calibration_thresholds_layers.json, layer_depth_curve.png, qc_session_L.json, qc_report_layers.csv"
     presentation:
       - "Test values are shown as value [ci_low, ci_high]; validation and test never share a column."
       - "Per-class rows with support < 100 carry a wide-uncertainty flag."
@@ -234,6 +297,11 @@ protocol:
       QC-L4: every layer_depth system has identical val/test images, labels, patients, split hash and label order
     layer_depth_warnings:
       QC-10: the probe is a lower bound for a model cut to k blocks
+    distillation_blocking:
+      QC-D1: both teacher checkpoints' sha256 equal the hashes in distillation.teacher.members
+      QC-D2: each rebuilt teacher reproduces its saved v2.0.0 validation logits (same image order; min per-class correlation >= 0.999; macro AUROC within 0.001)
+      QC-D3: soft labels exist for train images only, in df_train order; no val/test image receives a soft label
+      QC-D4: the student's exported val/test images, order, labels and split hash equal M08's
 
   limitations:
     - One training seed; no estimate of training variability.
@@ -257,3 +325,9 @@ protocol:
         Added the layer_depth experiment (3-raddino_layer_cut.ipynb): linear probes on the output of each of
         RAD-DINO's 12 blocks, selection rule (within 0.005 validation macro AUROC), tables T7-T9 and QC-L1..L4, QC-10.
         Written after the v2.0.0 cascade results and before any layer-depth result. Cascade rules unchanged.
+    - version: "2.2.0"
+      date: "2026-09-25"
+      change: >-
+        Added the distillation experiment (4-distillation.ipynb): teacher = v2.0.0 Average, student M10 = M08 recipe
+        with target 0.5*y + 0.5*q, go/no-go on teacher train AUROC (< 0.95), outcomes helps / matches / beats RAD-DINO,
+        QC-D1..D4, tables T10-T11. Written before any distillation result. Cascade and layer-depth rules unchanged.
