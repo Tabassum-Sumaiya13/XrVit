@@ -49,7 +49,7 @@ All notebooks run on Kaggle with a Tesla T4 GPU and Internet on.
 1. Attach the dataset `nih-chest-xrays/data` (images, `Data_Entry_2017.csv`, official list files).
 <!-- 2. **Cascade** ([2-staged_official_split.ipynb](2-staged_official_split.ipynb)): set one flag per session in the config cell. Sessions A and B train the CNN (about 2.8 h) and RAD-DINO (about 6.6 h), session T measures latency, and session C (CPU) runs calibration, the gate sweep and all test metrics. Outputs go to `results_s42/`. -->
 <!-- 2. **Distillation** ([4-distillation.ipynb](4-distillation.ipynb)): upload `results_s42/` as a Kaggle dataset (it already holds both `checkpoint_best.pt` files inside their run folders; the notebook checks their SHA-256), then run sessions D1+D2 on GPU (about 3.5 h) and D3 on CPU (about 15 min). Outputs go to `results_distill/`.
-3. Every notebook checks the split hash (`b9f2fbc9…`), patient separation and identical evaluation images before reporting anything. --> -->
+3. Every notebook checks the split hash (`b9f2fbc9…`), patient separation and identical evaluation images before reporting anything. --> 
 
 ## Limitations
 
