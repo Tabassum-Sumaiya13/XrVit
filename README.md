@@ -1,4 +1,7 @@
 # XrVit: RAD-DINO accuracy at CNN cost on chest X-rays
+Dataset: https://www.kaggle.com/datasets/nih-chest-xrays/data
+
+https://nihcc.app.box.com/v/ChestXray-NIHCC/folder/36938765345
 
 Multi-label classification of 14 findings on the NIH ChestX-ray14 **official test split**, with two trained models:
 a fast CNN (**ConvNeXt-Tiny**, 384 px) and an X-ray-pretrained transformer (**RAD-DINO**, ViT-B/14, 518 px).
