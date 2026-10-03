@@ -5,3 +5,13 @@ results_distill/
 distill_dataset/
 *.zip
 __pycache__/
+kaggle_upload/
+results_ablation/
+2-staged_official_split.ipynb/
+3-raddino_layer_cut.ipynb/
+biovil-t.ipynb/
+DM_Workbook.xlsx/
+DenseNet-121.ipynb/
+METHODOLOGY.md/
+RESULTS.md/
+.claude/
