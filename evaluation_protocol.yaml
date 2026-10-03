@@ -1,15 +1,16 @@
 # =============================================================================
 # EVALUATION PROTOCOL - two-stage cascade on NIH ChestX-ray14 (official split)
-# Version 2.2.0 (2026-09-25). Cascade study: 2-staged_official_split.ipynb (rules of 2.0.0, unchanged).
+# Version 2.3.0 (2026-09-30). Cascade study: 2-staged_official_split.ipynb (rules of 2.0.0, unchanged).
 # Layer-depth experiment (section layer_depth, added in 2.1.0): 3-raddino_layer_cut.ipynb.
 # Distillation experiment (section distillation, added in 2.2.0): 4-distillation.ipynb.
+# Distillation ablation (section distillation_ablation, added in 2.3.0): 5-ablation.ipynb.
 # Scope: one dataset, one split, two models, one training seed (42), no TTA.
 # This file holds rules only, no results.
 # =============================================================================
 
 protocol:
   id: CXR-CASCADE-EVAL
-  version: "2.2.0"
+  version: "2.3.0"
   task: multi-label binary classification of 14 findings on frontal chest X-rays
   label_order: [Atelectasis, Cardiomegaly, Effusion, Infiltration, Mass, Nodule,
                 Pneumonia, Pneumothorax, Consolidation, Edema, Emphysema,
@@ -213,6 +214,69 @@ protocol:
       - Validation is used for teacher calibration (v2.0.0), student early stopping, and student calibration/thresholds; test is never used.
 
   # ---------------------------------------------------------------------------
+  distillation_ablation:
+    added: >-
+      2026-09-30, after the v2.2.0 distillation results were known and before any ablation result existed.
+      Nothing in this section changes the cascade, layer-depth or distillation studies.
+    question: >-
+      Does the M10 gain need RAD-DINO in the teacher, or does a CNN-only teacher (self-distillation) give it too?
+    motivation: >-
+      The M10 teacher includes M08 itself, and self-distillation alone can improve a network (Born-Again Networks).
+      Post hoc (exploratory, 14 points): M10 gained on findings where RAD-DINO was not better than the CNN
+      (Edema -0.0015, Consolidation +0.0002 RAD-DINO minus CNN test AUROC), and the per-finding gain followed the
+      Average's advantage (Spearman 0.69) more than RAD-DINO's (0.43).
+    students:
+      A1a:
+        model_id: M11_CONVNEXT_TINY_KD_CNN_384
+        teacher: "q = p_M08 (CNN only; self-distillation)"
+      A1b:
+        model_id: M12_CONVNEXT_TINY_KD_RD_384
+        teacher: "q = p_M09 (RAD-DINO only)"
+      recipe: >-
+        identical to M10 (distillation.student): M08 recipe, ImageNet initialisation, seed 42,
+        t = 0.5 * y + 0.5 * q, same loss and model selection. The only change is q.
+      priority: A1a is required; A1b is run if GPU time allows. The analysis below covers both cases.
+    soft_labels:
+      source: >-
+        the D1 train logits of v2.2.0 (teacher/{model_id}_logits_train.npz), not recomputed; v2.0.0 Platt
+        calibration (calibration.json), not refitted. Only train images get soft labels.
+      check: the mean of the two calibrated teachers must reproduce M10's soft_labels_train.npz (QC-A1)
+    go_no_go: >-
+      distillation.go_no_go applied to each single teacher (go if its train macro AUROC < 0.95). The D1 values
+      (M08 0.9018, M09 0.9124) were known when this section was written, so both students are expected to be trained.
+    evaluation:
+      calibration_and_thresholds: evaluation.order steps 2-3, fitted on validation for every student
+      systems: [CNN alone, RAD-DINO alone, Average CNN+RAD-DINO, Distilled CNN (M10), Student A1a, Student A1b (if run)]
+      bootstrap: statistics.ci, same 1000 resamples (seed 20260922); the four v2.2.0 systems must reproduce T10 (QC-A4)
+      comparisons:
+        C1: "A1a - CNN alone: does self-distillation alone help?"
+        C2: "M10 - A1a: does adding RAD-DINO to the teacher help beyond self-distillation? (primary)"
+        C3: "A1b - CNN alone: does a RAD-DINO-only teacher help?"
+        C4: "M10 - A1b: does adding the CNN to the teacher help beyond RAD-DINO alone?"
+      multiple_testing: Holm over the comparisons that were run, per metric (4 with A1b, 2 without)
+      significant: >-
+        statistics.significant (CI of the difference excludes 0 AND Holm p < 0.05) AND the validation difference
+        has the same sign as the test difference
+      endpoints:
+        primary: C2 on test macro AUROC
+        secondary: C1, C3, C4 on macro AUROC; C1-C4 on macro AUPRC, macro F1, micro F1, macro precision, macro recall
+      outcomes:
+        raddino_adds: C2 significant and positive
+        cnn_teacher_better: C2 significant and negative
+        inconclusive: C2 not significant - the M10 gain is not shown to need RAD-DINO; report as such, not as "equal"
+        self_distillation_helps: C1 significant and positive
+      descriptive_only:
+        - "share of the M10 gain reached by each student: (student - CNN) / (M10 - CNN), test macro AUROC"
+        - "A1b - A1a, test macro AUROC with CI (not in the Holm family)"
+        - per-finding AUROC of all systems (exploratory)
+      use_in_paper: >-
+        raddino_adds -> keep the claim that RAD-DINO's knowledge contributes. inconclusive or cnn_teacher_better ->
+        state that self-distillation can explain the gain and soften the transfer wording. Report the result whatever it is.
+    limitations:
+      - One training seed; differences between students may be smaller than retraining variability.
+      - Same teacher-sharpness caveat as distillation.limitations.
+
+  # ---------------------------------------------------------------------------
   evaluation:
     order:
       - "1. Export raw logits for val and test (npz: image_index, patient_id, logits float32 [N,14], labels uint8 [N,14], label_order, split_sha256)."
@@ -272,6 +336,7 @@ protocol:
       T8_layer_paired: layer_depth - confirmatory comparisons of the selected depth (Holm) and descriptive depth-vs-RAD-DINO differences
       T9_layer_compute: layer_depth - per system latency (bs 1 and 32), compute ratio, val and test macro AUROC/AUPRC/F1 with CIs, selected_on_val
     distillation_files: "teacher/{model_id}_logits_train.npz, teacher/{model_id}_logits_val_rebuilt.npz, soft_labels_train.npz, distill_go_no_go.json, qc_session_D.json, run folder {dataset}__{split}__M10_CONVNEXT_TINY_KD_384__s42 (as per_run_folder); evaluation tables T10_distill_results (like T2), T11_distill_paired (like T3)"
+    ablation_files: "soft_labels_train_{A1a,A1b}.npz, go_no_go_{A1a,A1b}.json, qc_session_A.json, run folders {dataset}__{split}__M11_CONVNEXT_TINY_KD_CNN_384__s42 and ..._M12_CONVNEXT_TINY_KD_RD_384__s42 (as per_run_folder); evaluation tables T12_ablation_results (like T2), T13_ablation_paired (like T3); calibration_thresholds_ablation.json; ablation_outcome.json"
     layer_depth_files:"features/{split}_Lkk.npy (fp16), one run folder per depth ({dataset}__{split}__M09_RAD_DINO_518_CR_Lkk__s42: logits_val.npz, logits_test.npz, probe_log.csv, config.json), timing_M09_RAD_DINO_518_CR_Lkk.json, calibration_thresholds_layers.json, layer_depth_curve.png, qc_session_L.json, qc_report_layers.csv"
     presentation:
       - "Test values are shown as value [ci_low, ci_high]; validation and test never share a column."
@@ -302,6 +367,11 @@ protocol:
       QC-D2: each rebuilt teacher reproduces its saved v2.0.0 validation logits (same image order; min per-class correlation >= 0.999; macro AUROC within 0.001)
       QC-D3: soft labels exist for train images only, in df_train order; no val/test image receives a soft label
       QC-D4: the student's exported val/test images, order, labels and split hash equal M08's
+    ablation_blocking:
+      QC-A1: each teacher's saved train logits carry the recorded checkpoint sha256, the expected split hash, df_train's images/order/labels; the mean of the two calibrated teachers reproduces M10's soft labels (max |diff| <= 1e-6)
+      QC-A2: soft labels exist for train images only, in df_train order (as QC-D3)
+      QC-A3: each student's exported val/test images, order, labels and split hash equal M08's (as QC-D4)
+      QC-A4: CNN, RAD-DINO, Average and M10 macro AUROC (val and test values, test CIs) reproduce T10_distill_results within 1e-6; the largest difference over all shared rows is reported
 
   limitations:
     - One training seed; no estimate of training variability.
@@ -331,3 +401,10 @@ protocol:
         Added the distillation experiment (4-distillation.ipynb): teacher = v2.0.0 Average, student M10 = M08 recipe
         with target 0.5*y + 0.5*q, go/no-go on teacher train AUROC (< 0.95), outcomes helps / matches / beats RAD-DINO,
         QC-D1..D4, tables T10-T11. Written before any distillation result. Cascade and layer-depth rules unchanged.
+    - version: "2.3.0"
+      date: "2026-09-30"
+      change: >-
+        Added the distillation_ablation experiment (5-ablation.ipynb): students A1a (CNN-only teacher, M11) and A1b
+        (RAD-DINO-only teacher, M12) with the M10 recipe; comparisons C1-C4 (primary C2 = M10 - A1a), Holm over the
+        comparisons run, significance also requires the same sign on validation; QC-A1..A4, tables T12-T13.
+        Written before any ablation result. Earlier rules unchanged.

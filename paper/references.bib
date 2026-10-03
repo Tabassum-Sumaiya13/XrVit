@@ -1,0 +1,363 @@
+% =====================================================================
+%  references.bib  (IEEE style via IEEEtran.bst)
+%
+%  Verification status is noted above each entry:
+%    [checked]  details confirmed against the publisher / arXiv / DBLP page
+%    [from METHODOLOGY.md] taken from the project's methodology file; spot-check before submission
+%    [partial]  title/authors/DOI confirmed, some fields (volume, pages) still missing
+% =====================================================================
+
+% ---------------- Dataset and labels ----------------
+
+% [from METHODOLOGY.md]
+@inproceedings{wang2017chestxray8,
+  author    = {Wang, Xiaosong and Peng, Yifan and Lu, Le and Lu, Zhiyong and Bagheri, Mohammadhadi and Summers, Ronald M.},
+  title     = {{ChestX-ray8}: Hospital-scale chest {X}-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases},
+  booktitle = {Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2017},
+  pages     = {2097--2106}
+}
+
+% [from METHODOLOGY.md]
+@article{oakdenrayner2020exploring,
+  author  = {Oakden-Rayner, Luke},
+  title   = {Exploring large-scale public medical image datasets},
+  journal = {Academic Radiology},
+  volume  = {27},
+  number  = {1},
+  pages   = {106--112},
+  year    = {2020}
+}
+
+% [checked] arXiv 1711.05225
+@misc{rajpurkar2017chexnet,
+  author       = {Rajpurkar, Pranav and Irvin, Jeremy and Zhu, Kaylie and Yang, Brandon and Mehta, Hershel and Duan, Tony and Ding, Daisy and Bagul, Aarti and Langlotz, Curtis and Shpanskaya, Katie and Lungren, Matthew P. and Ng, Andrew Y.},
+  title        = {{CheXNet}: Radiologist-level pneumonia detection on chest {X}-rays with deep learning},
+  howpublished = {arXiv:1711.05225},
+  year         = {2017}
+}
+
+% ---------------- Clinical background ----------------
+
+% [checked] Chest 141(2):545-558
+@article{raoof2012interpretation,
+  author  = {Raoof, Suhail and Feigin, David and Sung, Arthur and Raoof, Sabiha and Irugulpati, Lavanya and Rosenow, Edward C.},
+  title   = {Interpretation of plain chest roentgenogram},
+  journal = {Chest},
+  volume  = {141},
+  number  = {2},
+  pages   = {545--558},
+  year    = {2012}
+}
+
+% [checked] RCR census report page and PDF (published 2025, reports 2024 data)
+@techreport{rcr2025census,
+  author      = {{The Royal College of Radiologists}},
+  title       = {Clinical Radiology Workforce Census 2024},
+  institution = {The Royal College of Radiologists},
+  address     = {London, U.K.},
+  year        = {2025},
+  url         = {https://www.rcr.ac.uk/media/4imb5jge/_rcr-2024-clinical-radiology-workforce-census-report.pdf}
+}
+
+% [checked] Med. Image Anal. 72:102125
+@article{calli2021deep,
+  author  = {{\c{C}}all{\i}, Erdi and Sogancioglu, Ecem and van Ginneken, Bram and van Leeuwen, Kicky G. and Murphy, Keelin},
+  title   = {Deep learning for chest {X}-ray analysis: A survey},
+  journal = {Medical Image Analysis},
+  volume  = {72},
+  pages   = {102125},
+  year    = {2021}
+}
+
+% [checked] PLOS Med 15(11): e1002683
+@article{zech2018variable,
+  author  = {Zech, John R. and Badgeley, Marcus A. and Liu, Manway and Costa, Anthony B. and Titano, Joseph J. and Oermann, Eric Karl},
+  title   = {Variable generalization performance of a deep learning model to detect pneumonia in chest radiographs: A cross-sectional study},
+  journal = {PLoS Medicine},
+  volume  = {15},
+  number  = {11},
+  pages   = {e1002683},
+  year    = {2018},
+  doi     = {10.1371/journal.pmed.1002683}
+}
+
+% ---------------- Foundation models and backbones ----------------
+
+% [checked] Nature 616:259-265
+@article{moor2023foundation,
+  author  = {Moor, Michael and Banerjee, Oishi and Abad, Zahra Shakeri Hossein and Krumholz, Harlan M. and Leskovec, Jure and Topol, Eric J. and Rajpurkar, Pranav},
+  title   = {Foundation models for generalist medical artificial intelligence},
+  journal = {Nature},
+  volume  = {616},
+  pages   = {259--265},
+  year    = {2023},
+  doi     = {10.1038/s41586-023-05881-4}
+}
+
+% [from METHODOLOGY.md]
+@article{perezgarcia2025raddino,
+  author  = {P{\'e}rez-Garc{\'i}a, Fernando and Sharma, Harshita and Bond-Taylor, Sam and others},
+  title   = {Exploring scalable medical image encoders beyond text supervision},
+  journal = {Nature Machine Intelligence},
+  volume  = {7},
+  pages   = {119--130},
+  year    = {2025}
+}
+
+% [from METHODOLOGY.md]
+@article{oquab2024dinov2,
+  author  = {Oquab, Maxime and others},
+  title   = {{DINOv2}: Learning robust visual features without supervision},
+  journal = {Transactions on Machine Learning Research},
+  year    = {2024}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{dosovitskiy2021vit,
+  author    = {Dosovitskiy, Alexey and others},
+  title     = {An image is worth 16x16 words: Transformers for image recognition at scale},
+  booktitle = {Proc. Int. Conf. Learning Representations (ICLR)},
+  year      = {2021}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{liu2022convnext,
+  author    = {Liu, Zhuang and Mao, Hanzi and Wu, Chao-Yuan and Feichtenhofer, Christoph and Darrell, Trevor and Xie, Saining},
+  title     = {A {ConvNet} for the 2020s},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2022},
+  pages     = {11976--11986}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{deng2009imagenet,
+  author    = {Deng, Jia and Dong, Wei and Socher, Richard and Li, Li-Jia and Li, Kai and Fei-Fei, Li},
+  title     = {{ImageNet}: A large-scale hierarchical image database},
+  booktitle = {Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2009},
+  pages     = {248--255}
+}
+
+% ---------------- Ensembles ----------------
+
+% [checked] MCS 2000, LNCS 1857, pp. 1-15
+@inproceedings{dietterich2000ensemble,
+  author    = {Dietterich, Thomas G.},
+  title     = {Ensemble methods in machine learning},
+  booktitle = {Multiple Classifier Systems (MCS 2000)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {1857},
+  publisher = {Springer},
+  address   = {Berlin, Heidelberg},
+  year      = {2000},
+  pages     = {1--15},
+  doi       = {10.1007/3-540-45014-9_1}
+}
+
+% [checked] NeurIPS 30, pp. 6402-6413
+@inproceedings{lakshminarayanan2017deep,
+  author    = {Lakshminarayanan, Balaji and Pritzel, Alexander and Blundell, Charles},
+  title     = {Simple and scalable predictive uncertainty estimation using deep ensembles},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {30},
+  year      = {2017},
+  pages     = {6402--6413}
+}
+
+% ---------------- Knowledge distillation ----------------
+
+% [from METHODOLOGY.md]
+@inproceedings{bucilua2006model,
+  author    = {Bucilu{\v{a}}, Cristian and Caruana, Rich and Niculescu-Mizil, Alexandru},
+  title     = {Model compression},
+  booktitle = {Proc. 12th ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining},
+  year      = {2006},
+  pages     = {535--541}
+}
+
+% [from METHODOLOGY.md] arXiv 1503.02531 (presented at NIPS 2014 Deep Learning Workshop)
+@misc{hinton2015distilling,
+  author       = {Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff},
+  title        = {Distilling the knowledge in a neural network},
+  howpublished = {arXiv:1503.02531},
+  year         = {2015}
+}
+
+% [checked] IJCV 129:1789-1819
+@article{gou2021knowledge,
+  author  = {Gou, Jianping and Yu, Baosheng and Maybank, Stephen J. and Tao, Dacheng},
+  title   = {Knowledge distillation: A survey},
+  journal = {International Journal of Computer Vision},
+  volume  = {129},
+  pages   = {1789--1819},
+  year    = {2021},
+  doi     = {10.1007/s11263-021-01453-z}
+}
+
+% [checked] ICCV 2019 pp. 4793-4801
+@inproceedings{cho2019efficacy,
+  author    = {Cho, Jang Hyun and Hariharan, Bharath},
+  title     = {On the efficacy of knowledge distillation},
+  booktitle = {Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV)},
+  year      = {2019},
+  pages     = {4793--4801}
+}
+
+% [checked] AAAI 2020 pp. 5191-5198
+@inproceedings{mirzadeh2020teacher,
+  author    = {Mirzadeh, Seyed Iman and Farajtabar, Mehrdad and Li, Ang and Levine, Nir and Matsukawa, Akihiro and Ghasemzadeh, Hassan},
+  title     = {Improved knowledge distillation via teacher assistant},
+  booktitle = {Proc. AAAI Conf. Artificial Intelligence},
+  year      = {2020},
+  pages     = {5191--5198}
+}
+
+% [checked] ICML 2018, PMLR 80:1607-1616
+@inproceedings{furlanello2018born,
+  author    = {Furlanello, Tommaso and Lipton, Zachary and Tschannen, Michael and Itti, Laurent and Anandkumar, Anima},
+  title     = {Born again neural networks},
+  booktitle = {Proc. 35th Int. Conf. Machine Learning (ICML)},
+  series    = {PMLR},
+  volume    = {80},
+  year      = {2018},
+  pages     = {1607--1616}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{li2017noisy,
+  author    = {Li, Yuncheng and Yang, Jianchao and Song, Yale and Cao, Liangliang and Luo, Jiebo and Li, Li-Jia},
+  title     = {Learning from noisy labels with distillation},
+  booktitle = {Proc. IEEE Int. Conf. Computer Vision (ICCV)},
+  year      = {2017},
+  pages     = {1910--1918}
+}
+
+% ---------------- Distillation for chest X-rays ----------------
+
+% [checked] IEEE Access 8:160749-160761
+@article{ho2020utilizing,
+  author  = {Ho, Thi Kieu Khanh and Gwak, Jeonghwan},
+  title   = {Utilizing knowledge distillation in deep learning for classification of chest {X}-ray abnormalities},
+  journal = {IEEE Access},
+  volume  = {8},
+  pages   = {160749--160761},
+  year    = {2020}
+}
+
+% [checked] IEEE/ACM TCBB 21(4):846-856 (early access 2023; issue year 2024 -- confirm on IEEE Xplore)
+@article{termritthikun2024explainable,
+  author  = {Termritthikun, Chakkrit and Umer, Ayaz and Suwanwimolkul, Suwichaya and Xia, Feng and Lee, Ivan},
+  title   = {Explainable knowledge distillation for on-device chest {X}-ray classification},
+  journal = {IEEE/ACM Transactions on Computational Biology and Bioinformatics},
+  volume  = {21},
+  number  = {4},
+  pages   = {846--856},
+  year    = {2024}
+}
+
+% [partial] authors, title, journal, year and DOI confirmed; volume/article number still to add
+@article{kishore2025enhancing,
+  author  = {Kishore, Jaydeep and Jain, Akshita and Koushika, K. Krishna and Mishra, Pawan Kumar and Karanwal, Shekhar and Solanki, Surendra},
+  title   = {Enhancing medical diagnosis on chest {X}-rays: Knowledge distillation from self-supervised based model to compressed student model},
+  journal = {Discover Computing},
+  year    = {2025},
+  doi     = {10.1007/s10791-025-09637-8}
+}
+
+% ---------------- Cascades and conditional computation ----------------
+
+% [from METHODOLOGY.md]
+@inproceedings{viola2001rapid,
+  author    = {Viola, Paul and Jones, Michael},
+  title     = {Rapid object detection using a boosted cascade of simple features},
+  booktitle = {Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2001}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{teerapittayanon2016branchynet,
+  author    = {Teerapittayanon, Surat and McDanel, Bradley and Kung, H. T.},
+  title     = {{BranchyNet}: Fast inference via early exiting from deep neural networks},
+  booktitle = {Proc. 23rd Int. Conf. Pattern Recognition (ICPR)},
+  year      = {2016},
+  pages     = {2464--2469}
+}
+
+% [checked] UAI 2018 pp. 580-590
+@inproceedings{wang2018idk,
+  author    = {Wang, Xin and Luo, Yujia and Crankshaw, Daniel and Tumanov, Alexey and Yu, Fisher and Gonzalez, Joseph E.},
+  title     = {{IDK} cascades: Fast deep learning by learning not to overthink},
+  booktitle = {Proc. 34th Conf. Uncertainty in Artificial Intelligence (UAI)},
+  year      = {2018},
+  pages     = {580--590}
+}
+
+% [checked] ICLR 2022 (OpenReview MvO2t0vbs4-)
+@inproceedings{wang2022wisdom,
+  author    = {Wang, Xiaofang and Kondratyuk, Dan and Christiansen, Eric and Kitani, Kris M. and Movshovitz-Attias, Yair and Eban, Elad},
+  title     = {Wisdom of committees: An overlooked approach to faster and more accurate models},
+  booktitle = {Proc. Int. Conf. Learning Representations (ICLR)},
+  year      = {2022}
+}
+
+% ---------------- Training, calibration and evaluation ----------------
+
+% [from METHODOLOGY.md]
+@inproceedings{ridnik2021asl,
+  author    = {Ridnik, Tal and Ben-Baruch, Emanuel and Zamir, Nadav and Noy, Asaf and Friedman, Itamar and Protter, Matan and Zelnik-Manor, Lihi},
+  title     = {Asymmetric loss for multi-label classification},
+  booktitle = {Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV)},
+  year      = {2021},
+  pages     = {82--91}
+}
+
+% [from METHODOLOGY.md]
+@incollection{platt1999probabilistic,
+  author    = {Platt, John},
+  title     = {Probabilistic outputs for support vector machines and comparisons to regularized likelihood methods},
+  booktitle = {Advances in Large Margin Classifiers},
+  publisher = {MIT Press},
+  year      = {1999},
+  pages     = {61--74}
+}
+
+% [from METHODOLOGY.md]
+@inproceedings{guo2017calibration,
+  author    = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.},
+  title     = {On calibration of modern neural networks},
+  booktitle = {Proc. 34th Int. Conf. Machine Learning (ICML)},
+  year      = {2017},
+  pages     = {1321--1330}
+}
+
+% [from METHODOLOGY.md]
+@article{hanley1982meaning,
+  author  = {Hanley, James A. and McNeil, Barbara J.},
+  title   = {The meaning and use of the area under a receiver operating characteristic ({ROC}) curve},
+  journal = {Radiology},
+  volume  = {143},
+  number  = {1},
+  pages   = {29--36},
+  year    = {1982}
+}
+
+% [from METHODOLOGY.md]
+@book{efron1993bootstrap,
+  author    = {Efron, Bradley and Tibshirani, Robert J.},
+  title     = {An Introduction to the Bootstrap},
+  publisher = {Chapman \& Hall},
+  address   = {New York},
+  year      = {1993}
+}
+
+% [from METHODOLOGY.md]
+@article{holm1979simple,
+  author  = {Holm, Sture},
+  title   = {A simple sequentially rejective multiple test procedure},
+  journal = {Scandinavian Journal of Statistics},
+  volume  = {6},
+  number  = {2},
+  pages   = {65--70},
+  year    = {1979}
+}
