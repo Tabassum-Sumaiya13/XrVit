@@ -16,7 +16,6 @@ The question: can we get RAD-DINO's accuracy without paying RAD-DINO's cost on e
 |---|---|---:|---:|
 | CNN alone | 0.8263 [0.8200, 0.8317] | 0.3539 | 0.18 |
 | **Distilled CNN** | **0.8339** [0.8283, 0.8387] | **0.3702** | **0.18** |
-| Cascade (gate t = 0.80) | 0.8325 [0.8264, 0.8379] | 0.3709 | 0.95 |
 | RAD-DINO alone | 0.8364 [0.8303, 0.8415] | 0.3788 | 1.00 |
 | Average of both models | 0.8428 [0.8373, 0.8478] | 0.3818 | 1.18 |
 
