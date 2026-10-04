@@ -1,6 +1,6 @@
 
 .claude/
-
+__pycache__/
 paper/
 results_distill/
 results_layers/
@@ -16,3 +16,6 @@ DenseNet-121.ipynb
 DM_Workbook.xlsx
 METHODOLOGY.md
 RESULTS.md
+attribution_output/
+cxr-attribution-code.zip
+cxr-distill-results.zip
