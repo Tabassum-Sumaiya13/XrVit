@@ -1,7 +1,18 @@
-Bs output 42seed/
+
+.claude/
+
+paper/
+results_distill/
 results_layers/
 results_s42/
-results_distill/
-distill_dataset/
-*.zip
-__pycache__/
+
+2-staged_official_split.ipynb
+3-raddino_layer_cut.ipynb
+
+biovil-t.ipynb
+convnext_base_nih_official_split.ipynb
+convnext_tiny_nih_official_split.ipynb
+DenseNet-121.ipynb
+DM_Workbook.xlsx
+METHODOLOGY.md
+RESULTS.md
