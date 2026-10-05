@@ -61,3 +61,55 @@ cells in the notebook rather than inventing a separate local environment.
    training.
 7. Save or download the generated result directory before the Kaggle session
    expires.
+
+The notebooks locate the official split lists under `/kaggle/input`. The
+official test set must remain untouched until final evaluation.
+
+## Recommended execution order
+
+### 1. Establish the RAD-DINO teacher
+
+Run [`rad-dino_official-split.ipynb`](./rad-dino_official-split.ipynb).
+The notebook:
+
+- loads NIH metadata and the official train/validation and test lists;
+- carves validation patients from the official training pool;
+- checks for patient overlap and split consistency;
+- trains/evaluates RAD-DINO;
+- writes checkpoints, logits, calibration information, and metrics.
+
+The notebook defaults to 518-pixel images and batch size 12. If the GPU runs
+out of memory, its setup notes recommend reducing the image size to 336 and
+the batch size to 8. Treat results from changed settings as a separate
+experiment.
+
+### 2. Run distillation
+
+Run [`4-distillation-ipynb.ipynb`](./4-distillation-ipynb.ipynb) after the
+teacher outputs are available. The distillation workflow uses the teacher
+predictions to train a ConvNeXt-Tiny student, then evaluates the student on
+the same official test split.
+
+The notebook is organized around the distillation stages described in its
+markdown cells. Run them in order and preserve the produced teacher logits
+and checkpoints; they are inputs to later stages and should not be silently
+recomputed with different preprocessing or splits.
+
+### 3. Generate figures and inspect analyses
+
+After obtaining the expected result files, run:
+
+```bash
+python generate_plots.py
+```
+
+This creates a `figures/` directory containing the trade-off and per-finding
+plots. The script uses the values embedded in the file, so it is a plotting
+utility rather than a metrics recomputation pipeline.
+
+For post-hoc analysis, read [`exploratory/README.md`](./exploratory/README.md)
+first. Those scripts expect result directories at paths configured for the
+original author's environment and may need their paths updated before use.
+Their outputs are explanatory, not confirmatory.
+
+
